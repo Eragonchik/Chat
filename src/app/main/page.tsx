@@ -37,10 +37,8 @@ export default async function Page() {
   };
 
   return (
-    <div>
-      <div className="body">
-        <Chat sendMessage={sendMessage}/>
-      </div>
+    <div className="body">
+      <Chat sendMessage={sendMessage}/>
     </div>
   );
 }
