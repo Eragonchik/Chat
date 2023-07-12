@@ -14,10 +14,9 @@ import Image from "next/image";
 import { IMember } from "@/interfces/member";
 import { IMessage } from "@/interfces/message";
 import EmojiPicker, {Emoji, EmojiClickData} from 'emoji-picker-react';
-import Link from "next/link";
 
 export const Chat: FC<{
-  sendMessage: (color: string, payload: string, type: string) => void;
+  sendMessage: (color: string, payload: string, type: string, replyingMessage : IMessage | null) => void;
 }> = (props) => {
   
   const bottomRef = useRef(null);
@@ -38,6 +37,9 @@ export const Chat: FC<{
   const [membersInfo, setMembersInfo] = useState([] as IMember[]);
   const [textOfMessage, setTextOfMessage] = useState("");
 
+  const [isReplying , setIsReplying] = useState(false);
+  const replyingMessage = useRef<IMessage | null>(null);
+
   const me = useRef({} as IMember);
 
   const { sendMessage } = props;
@@ -50,6 +52,16 @@ export const Chat: FC<{
     });
   }
 
+  const onMessageClick = (event : React.PointerEvent, message : IMessage) => {
+    event.preventDefault();
+    replyingMessage.current = message;
+    setIsReplying(true);
+  } 
+
+  const CancelReplying = () => {
+    replyingMessage.current = null;
+    setIsReplying(false);
+  };
 
   const onFucusHandler = () => {
 
@@ -163,22 +175,23 @@ export const Chat: FC<{
   const sendMessageFunc = (event? : React.MouseEvent) => {
     const textarea = document.querySelector('textarea');
     if (typeOfMessage.current == 'audio') {
-      sendMessage(me.current.info.color as string, audioMessage, 'audio');
+      sendMessage(me.current.info.color as string, audioMessage, 'audio', replyingMessage.current);
       chunks.current = [];
       mediaRecorder.current = null;
       setAudioMessage('');
     } 
     else if (typeOfMessage.current == 'image') {
-      sendMessage(me.current.info.color as string, imageMessage.current!, 'image');
+      sendMessage(me.current.info.color as string, imageMessage.current!, 'image', replyingMessage.current);
       imageMessage.current = '';
     }
     else if (typeOfMessage.current == 'text') {
       if (!textOfMessage.length) return
-      sendMessage(me.current.info.color as string, textOfMessage, 'text');
+      sendMessage(me.current.info.color as string, textOfMessage, 'text', replyingMessage.current);
       setTextOfMessage("");
       textarea?.focus();
     }
-
+    replyingMessage.current = null;
+    setIsReplying(false);
     typeOfMessage.current = 'text';
   };
 
@@ -191,17 +204,18 @@ export const Chat: FC<{
       event.preventDefault();
 
       if (typeOfMessage.current == 'audio') {
-        sendMessage(me.current.info.color as string, audioMessage, 'audio');
+        sendMessage(me.current.info.color as string, audioMessage, 'audio', replyingMessage.current);
         chunks.current = [];
         mediaRecorder.current = null;
         setAudioMessage('');
       }
       else if (typeOfMessage.current == 'text') {
         if (!textOfMessage.length || textOfMessage == ' ') return
-        sendMessage(me.current.info.color as string, textOfMessage, 'text');
+        sendMessage(me.current.info.color as string, textOfMessage, 'text', replyingMessage.current);
         setTextOfMessage("");
       }
-      
+      replyingMessage.current = null;
+      setIsReplying(false);
       typeOfMessage.current = 'text';
     }
   };
@@ -226,10 +240,10 @@ export const Chat: FC<{
       const audio = document.createElement("audio");
       body.appendChild(audio);
       const blob = new Blob(chunks.current, { type: "audio/ogg; codecs=opus" });
+      setAudioMessage(await blobToBase64(blob));
       chunks.current = [];
       setIsRecording(false);
       typeOfMessage.current = 'audio';
-      setAudioMessage(await blobToBase64(blob));
     }
 
     mediaRecorder.current.start()
@@ -240,11 +254,6 @@ export const Chat: FC<{
     }, 400)
 
   };
-
-  const OnMouseUpHandler = async(event : React.PointerEvent) => {
-    event.preventDefault();
-    mediaRecorder.current!.stop();
-  }
 
   return (
     <>
@@ -333,9 +342,12 @@ export const Chat: FC<{
                 {messages.map((message) => {
                   const isMe = message.autor == me.current.id;
                   const type = message.type;
+                  const isReplyingMessage = message.replyingMessage != null ? true : false;
+                  const replyingMessage = message.replyingMessage;
 
                   return (
                     <div
+                    onPointerDown={ (e) => onMessageClick(e, message)}
                       key={message.id}
                       className={
                         "d-flex mb-4 " +
@@ -355,9 +367,26 @@ export const Chat: FC<{
                       <div
                         className="msg_cotainer"
                         style={{ backgroundColor: message.color }}>
+                        {
+                        isReplyingMessage && 
+                        <div className="d-flex align-items-center" style={{backgroundColor : replyingMessage.color, borderRadius: "15px"}}>
+                          {replyingMessage.autor} : 
+                          { replyingMessage.type == 'audio' && <audio controls={true} src={replyingMessage.payload}></audio>}
+                          { replyingMessage.type == 'image' && 
+                              <Image
+                                src={replyingMessage.payload}
+                                width={600}
+                                height={600}
+                                quality={20}
+                                className="user_img"
+                                alt="Picture of the author"
+                              />
+                            }
+                          { replyingMessage.type == 'text' && replyingMessage.payload as string }
+                        </div>
+                        }
                         { type == 'audio' && <audio controls={true} src={message.payload}></audio>}
                         { type == 'image' && 
-                          // <Link href={((new Image(message.payload).src))} target="_blank" download={message.payload}>
                             <Image
                               src={message.payload}
                               width={600}
@@ -366,7 +395,6 @@ export const Chat: FC<{
                               className="user_img"
                               alt="Picture of the author"
                             />
-                          // </Link>
                           }
                         { type == 'text' && message.payload as string }
                         <span className="msg_time">{message.time}</span>
@@ -377,7 +405,27 @@ export const Chat: FC<{
                 <div ref={bottomRef} />
               </div>
               <div className="card-footer">
-                <div className="input-group">
+                
+                {
+                  isReplying && 
+                  <div className="replyingMessage mb-1 d-flex align-items-center">
+                    <b>{replyingMessage.current?.autor}</b> : 
+                      { replyingMessage.current?.type == 'audio' && <audio controls={true} src={replyingMessage.current?.payload}></audio>}
+                      { replyingMessage.current?.type == 'image' && 
+                        <Image
+                          src={replyingMessage.current?.payload}
+                          width={600}
+                          height={600}
+                          quality={20}
+                          className="user_img"
+                          alt="Picture of the author"
+                        />
+                        }
+                      { replyingMessage.current?.type == 'text' && replyingMessage.current?.payload as string }
+                    <button type="button" className="btn-close position-absolute me-4 end-0" aria-label="Close" onPointerDown={CancelReplying}></button>
+                  </div>
+                }
+                <div className="input-group ]">
                   <div className="input-group-append  d-flex input-group-text send_btn btn_group_right">
                       <input type="file" id="input-file" multiple={true} accept="image/*" style={{display:'none'}}/>
                       <label htmlFor="input-file" className="btn text-black">
@@ -421,7 +469,6 @@ export const Chat: FC<{
                       <button
                         className="btn"
                         onPointerDown={OnMouseDownHandler}
-                        onPointerUp={OnMouseUpHandler}
                       >
                         {isRecording ? 
                         'Recording'

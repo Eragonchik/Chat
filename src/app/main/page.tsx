@@ -7,6 +7,7 @@ import "./globals.css";
 import { pusherServer } from "@/lib/pusher";
 import Image from 'next/image'
 import { Chat } from "@/components/Chat/Chat";
+import { IMessage } from "@/interfces/message";
 
 export const metadata: Metadata = {
   title: "Page",
@@ -19,7 +20,7 @@ export default async function Page() {
     redirect("/");
   }
 
-  const sendMessage = async (color : string, payload : string, type : string) => {
+  const sendMessage = async (color : string, payload : string, type : string, replyingMessage : IMessage | null) => {
     "use server";
 
     const time =  (new Date).getHours() + ':' + (new Date).getMinutes() + ':' + (new Date).getSeconds();
@@ -32,7 +33,8 @@ export default async function Page() {
         color,
         time: time,
         img: session.user?.image,
-        type
+        type,
+        replyingMessage
       },
     }).catch((e) => console.log(e));
   };

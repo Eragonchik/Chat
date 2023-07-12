@@ -6,4 +6,5 @@ export interface IMessage {
   time: string,
   img: string,
   type: string
+  replyingMessage : IMessage
 }

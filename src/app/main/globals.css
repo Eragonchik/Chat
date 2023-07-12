@@ -245,6 +245,12 @@ html,body{
   transform: translate(-50%,-100%);
 }
 
+.replyingMessage{
+  background-color: rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  border-radius: 15px !important;
+}
+
 @media (max-width: 576px) {
   .contacts_card {
     margin-bottom: 15px !important;
