@@ -19,7 +19,7 @@ export default async function Page() {
     redirect("/");
   }
 
-  const sendMessage = async (color : string, text : string) => {
+  const sendMessage = async (color : string, payload : string, type : string) => {
     "use server";
 
     const time =  (new Date).getHours() + ':' + (new Date).getMinutes() + ':' + (new Date).getSeconds();
@@ -28,12 +28,13 @@ export default async function Page() {
       message: {
         id: +Date.now(),
         autor: session.user?.name,
-        text,
+        payload,
         color,
         time: time,
-        img: session.user?.image
+        img: session.user?.image,
+        type
       },
-    });
+    }).catch((e) => console.log(e));
   };
 
   return (

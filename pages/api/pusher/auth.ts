@@ -18,16 +18,24 @@ export default async function handler(
   const socketId = request.body.socket_id;
   const channel = request.body.channel_name;
 
-  const r = Math.floor(Math.random()*255);
-  const g = Math.floor(Math.random()*255);
-  const b = Math.floor(Math.random()*255);
-  const color = `rgb(${r},${g},${b})`;
+  const stringToColour = (str: string) => {
+    let hash = 0;
+    str.split('').forEach(char => {
+      hash = char.charCodeAt(0) + ((hash << 5) - hash)
+    })
+    let colour = '#'
+    for (let i = 0; i < 3; i++) {
+      const value = (hash >> (i * 8)) & 0xff
+      colour += value.toString(16).padStart(2, '0')
+    }
+    return colour
+  }
 
   const data = {
     user_id: session.user.name,
     user_info: {
       img: session.user.image,
-      color: color
+      color: stringToColour(session.user.email)
     }
   };
 

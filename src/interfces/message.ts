@@ -1,8 +1,9 @@
 export interface IMessage {
   id: number,
   autor: string,
-  text: string
+  payload: string,
   color: string
   time: string,
-  img: string
+  img: string,
+  type: string
 }

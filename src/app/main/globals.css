@@ -27,6 +27,12 @@ html,body{
   background: linear-gradient(to right, #91eae4, #86a8e7, #7f7fd5);
 }
 
+.users_btn{
+  position: absolute;
+  top: 5px;
+  left: 5px;
+}
+
 .contacts_body {
   padding: 0.75rem 0 !important;
   overflow-y: auto;
@@ -75,13 +81,19 @@ html,body{
   cursor: pointer;
   height: 100%;
 }
-.send_btn {
+.btn_group_left{
   border-radius: 0 15px 15px 0 !important;
   background-color: rgba(0, 0, 0, 0.3) !important;
+}
+.btn_group_right{
+  border-radius: 15px 0 0 15px !important;
+  background-color: rgba(0, 0, 0, 0.3) !important;
+}
+.send_btn {
+  background-color: transparent;
   border: 0 !important;
   color: white !important;
   cursor: pointer;
-  height: 100%;
 }
 .search_btn {
   border-radius: 0 15px 15px 0 !important;
@@ -228,6 +240,11 @@ html,body{
   cursor: pointer;
   background-color: rgba(0, 0, 0, 0.2);
 }
+
+.emoji_picker{
+  transform: translate(-50%,-100%);
+}
+
 @media (max-width: 576px) {
   .contacts_card {
     margin-bottom: 15px !important;
