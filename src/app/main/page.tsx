@@ -20,28 +20,46 @@ export default async function Page() {
     redirect("/");
   }
 
-  const sendMessage = async (color : string, payload : string, type : string, replyingMessage : IMessage | null) => {
+  const sendMessage = async (payload : string, type : string, replyingMessage : IMessage | null) => {
     "use server";
 
-    const time =  (new Date).getHours() + ':' + (new Date).getMinutes() + ':' + (new Date).getSeconds();
+    const time = Date.now();
 
     pusherServer.trigger("presence-channel", "message-send", {
       message: {
         id: +Date.now(),
         autor: session.user?.name,
         payload,
-        color,
         time: time,
         img: session.user?.image,
         type,
-        replyingMessage
+        replyingMessage,
+        isRead : false
       },
     }).catch((e) => console.log(e));
   };
 
+  const userTyping = async (user : string) => {
+    "use server";
+
+    pusherServer.trigger("presence-channel", "user-typing", {
+      user
+    }).catch((e) => console.log(e));
+    
+  };
+
+  const readMessages = async (user : string) => {
+    "use server";
+
+    pusherServer.trigger("presence-channel", "user-read-messages", {
+      user
+    }).catch((e) => console.log(e));
+    
+  };
+
   return (
     <div className="body">
-      <Chat sendMessage={sendMessage}/>
+      <Chat sendMessage={sendMessage} userTyping={userTyping} readMessages={readMessages}/>
     </div>
   );
 }

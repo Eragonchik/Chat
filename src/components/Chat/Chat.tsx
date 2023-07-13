@@ -14,9 +14,12 @@ import Image from "next/image";
 import { IMember } from "@/interfces/member";
 import { IMessage } from "@/interfces/message";
 import EmojiPicker, {Emoji, EmojiClickData} from 'emoji-picker-react';
+import Typing from "../Typing/Typing";
 
 export const Chat: FC<{
-  sendMessage: (color: string, payload: string, type: string, replyingMessage : IMessage | null) => void;
+  sendMessage: (payload: string, type: string, replyingMessage : IMessage | null) => void,
+  userTyping: (user: string) => void,
+  readMessages: (user: string) => void
 }> = (props) => {
   
   const bottomRef = useRef(null);
@@ -40,9 +43,33 @@ export const Chat: FC<{
   const [isReplying , setIsReplying] = useState(false);
   const replyingMessage = useRef<IMessage | null>(null);
 
+  const [typingUsers, setTypingUsers] = useState<string[]>([]);
+
+  const canPublish = useRef<boolean>(true);
+  const timer = useRef< ReturnType<typeof setTimeout> >();
+
   const me = useRef({} as IMember);
 
-  const { sendMessage } = props;
+  const { sendMessage, userTyping, readMessages } = props;
+
+  useEffect(() => {
+
+    if(audioMessage || textOfMessage) {
+
+      if(canPublish.current) {
+        userTyping(me.current.id);
+    
+        canPublish.current = false;
+
+        setTimeout(function() {
+          canPublish.current = true;
+        }, 200);
+
+      }
+
+    }
+
+  }, [audioMessage, textOfMessage, userTyping])
 
   function blobToBase64(blob : Blob) {
     return new Promise<string>((resolve) => {
@@ -63,9 +90,48 @@ export const Chat: FC<{
     setIsReplying(false);
   };
 
+  const ReadAllNotMineMessages = () => {
+
+    setMessages((prev) =>  {
+
+      return prev.map((message) => {
+        if (me.current.id !== message.autor) {
+
+          message.isRead = true;
+
+        }
+        return message
+      })
+
+    });
+
+  };
+
+  const ReadAllMeMessages = () => {
+
+    setMessages((prev) =>  {
+
+      return prev.map((message) => {
+        if (me.current.id == message.autor) {
+
+          message.isRead = true;
+
+        }
+        return message
+      })
+
+    });
+
+  };
+
   const onFucusHandler = () => {
 
     audio.current = new Audio("/sounds/in.mp3");
+
+    ReadAllNotMineMessages();
+
+    readMessages(me.current.id);
+
 
   };
 
@@ -95,25 +161,60 @@ export const Chat: FC<{
     
     window.addEventListener('focus', onFucusHandler);
     window.addEventListener('blur', onBlurHandler);
+    window.addEventListener('click', onFucusHandler);
 
     return () => {
       window.removeEventListener('focus', onFucusHandler);
       window.removeEventListener('blur', onBlurHandler);
+      window.removeEventListener('click', onFucusHandler);
       input?.removeEventListener('change', changeHandler)
     }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
 
     function messageSendHandler(arg: { message: IMessage }) {
-      setMessages((prev) => [...prev, arg.message]);
+
 
       if (me.current.id !== arg.message.autor) {
 
         audio.current?.play();
 
-      } 
+      }
+      
+      setMessages((prev) => [...prev, arg.message]);
+
+    }
+
+    function userReadMessagesHandler({ user } : { user : string }){
+
+      if (me.current.id != user) {
+        ReadAllMeMessages();
+      }
+
+    }
+
+    function userTypingHandler({ user } : { user : string }) {
+
+      setTypingUsers(users => {
+
+        if (!users.includes(user)) {
+
+          
+          clearTimeout(timer.current);
+          timer.current = setTimeout( () => {
+            setTypingUsers((prev) => { return ([...prev].filter((item) => item != user)) } )
+          }, 900);
+
+          return [...users, user]
+        }
+        else {
+          return users
+        }
+
+      });
       
     }
 
@@ -144,6 +245,10 @@ export const Chat: FC<{
 
     channel.bind("pusher:subscription_succeeded", subscriptionSucceededHandler);
 
+    channel.bind("user-typing", userTypingHandler);
+
+    channel.bind("user-read-messages", userReadMessagesHandler);
+
     channel.bind("pusher:member_added", memberAddedHandler);
 
     channel.bind("pusher:member_removed", memberRemovedHandler);
@@ -153,10 +258,11 @@ export const Chat: FC<{
 
       channel.unbind("message-send", messageSendHandler);
 
-      channel.unbind(
-        "pusher:subscription_succeeded",
-        subscriptionSucceededHandler
-      );
+      channel.unbind("pusher:subscription_succeeded", subscriptionSucceededHandler);
+
+      channel.unbind("user-typing", userTypingHandler);
+
+      channel.unbind("user-read-messages", userReadMessagesHandler);
 
       channel.unbind("pusher:member_added", memberAddedHandler);
 
@@ -175,18 +281,18 @@ export const Chat: FC<{
   const sendMessageFunc = (event? : React.MouseEvent) => {
     const textarea = document.querySelector('textarea');
     if (typeOfMessage.current == 'audio') {
-      sendMessage(me.current.info.color as string, audioMessage, 'audio', replyingMessage.current);
+      sendMessage(audioMessage, 'audio', replyingMessage.current);
       chunks.current = [];
       mediaRecorder.current = null;
       setAudioMessage('');
     } 
     else if (typeOfMessage.current == 'image') {
-      sendMessage(me.current.info.color as string, imageMessage.current!, 'image', replyingMessage.current);
+      sendMessage(imageMessage.current!, 'image', replyingMessage.current);
       imageMessage.current = '';
     }
     else if (typeOfMessage.current == 'text') {
       if (!textOfMessage.length) return
-      sendMessage(me.current.info.color as string, textOfMessage, 'text', replyingMessage.current);
+      sendMessage(textOfMessage, 'text', replyingMessage.current);
       setTextOfMessage("");
       textarea?.focus();
     }
@@ -204,14 +310,14 @@ export const Chat: FC<{
       event.preventDefault();
 
       if (typeOfMessage.current == 'audio') {
-        sendMessage(me.current.info.color as string, audioMessage, 'audio', replyingMessage.current);
+        sendMessage(audioMessage, 'audio', replyingMessage.current);
         chunks.current = [];
         mediaRecorder.current = null;
         setAudioMessage('');
       }
       else if (typeOfMessage.current == 'text') {
         if (!textOfMessage.length || textOfMessage == ' ') return
-        sendMessage(me.current.info.color as string, textOfMessage, 'text', replyingMessage.current);
+        sendMessage(textOfMessage, 'text', replyingMessage.current);
         setTextOfMessage("");
       }
       replyingMessage.current = null;
@@ -278,10 +384,7 @@ export const Chat: FC<{
                             alt="Picture of the author"
                           />
                           <span
-                            className="online_icon"
-                            style={{
-                              backgroundColor: memberInfo.info.color,
-                            }}></span>
+                            className="online_icon"></span>
                         </div>
                         <div className="user_info">
                           <span>{memberInfo.id}</span>
@@ -313,10 +416,7 @@ export const Chat: FC<{
                             alt="Picture of the author"
                           />
                           <span
-                            className="online_icon"
-                            style={{
-                              backgroundColor: memberInfo.info.color,
-                            }}></span>
+                            className="online_icon"></span>
                         </div>
                         <div className="user_info">
                           <span>{memberInfo.id}</span>
@@ -341,9 +441,12 @@ export const Chat: FC<{
               <div className="card-body msg_card_body mt-5">
                 {messages.map((message) => {
                   const isMe = message.autor == me.current.id;
+                  const isRead = message.isRead;
                   const type = message.type;
                   const isReplyingMessage = message.replyingMessage != null ? true : false;
                   const replyingMessage = message.replyingMessage;
+                  const timeOfMessage = new Date(message.time)
+                  const timeInFormat =  timeOfMessage.getHours() + ':' + timeOfMessage.getMinutes() + ':' + timeOfMessage.getSeconds();
 
                   return (
                     <div
@@ -365,11 +468,10 @@ export const Chat: FC<{
                         </div>
                       )}
                       <div
-                        className="msg_cotainer"
-                        style={{ backgroundColor: message.color }}>
+                        className={(isMe ? "msg_cotainer_send " : "msg_cotainer ") + (isRead ? "" : "opacity-50 ")}>
                         {
                         isReplyingMessage && 
-                        <div className="d-flex align-items-center" style={{backgroundColor : replyingMessage.color, borderRadius: "15px"}}>
+                        <div className="d-flex align-items-center replyingMessage">
                           {replyingMessage.autor} : 
                           { replyingMessage.type == 'audio' && <audio controls={true} src={replyingMessage.payload}></audio>}
                           { replyingMessage.type == 'image' && 
@@ -397,15 +499,25 @@ export const Chat: FC<{
                             />
                           }
                         { type == 'text' && message.payload as string }
-                        <span className="msg_time">{message.time}</span>
+                        <span className="msg_time">{timeInFormat}</span>
                       </div>
                     </div>
                   );
                 })}
                 <div ref={bottomRef} />
               </div>
-              <div className="card-footer">
-                
+              <div className="card-footer position-relative">
+                <div className="typing_container d-flex">
+                  {typingUsers.map((user) => {
+
+                    const isMe = user == me.current.id;
+
+                    if (!isMe) {
+                      return (<Typing key={user} name={user}/>)
+                    }
+
+                  })}
+                </div>
                 {
                   isReplying && 
                   <div className="replyingMessage mb-1 d-flex align-items-center">

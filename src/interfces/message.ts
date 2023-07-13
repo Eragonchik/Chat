@@ -1,4 +1,5 @@
 export interface IMessage {
+  isRead: boolean,
   id: number,
   autor: string,
   payload: string,
